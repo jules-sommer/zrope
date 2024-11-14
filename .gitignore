@@ -2,3 +2,4 @@
 /zig-out
 /target
 dump.rdb
+.zig-cache

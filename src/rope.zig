@@ -28,7 +28,7 @@ const Node = struct {
     data: [cap_bytes]u8 = undefined,
 
     fn dir(self: *const Node) u1 {
-        return if (self.parent) |p| @boolToInt(p.child[1] == self) else 0;
+        return if (self.parent) |p| @intFromBool(p.child[1] == self) else 0;
     }
 
     fn update(self: *Node) void {
@@ -122,8 +122,8 @@ fn createTree(allocator: Allocator, data: []const u8) Allocator.Error!*Node {
     var node: *Node = undefined;
     if (data.len <= cap_bytes) {
         node = try allocator.create(Node);
-        node.* = .{ .len = @intCast(u8, data.len) };
-        std.mem.copy(u8, node.data[0..], data);
+        node.* = .{ .len = @intCast(data.len) };
+        std.mem.copyForwards(u8, node.data[0..], data);
     } else {
         const blocks = data.len / cap_bytes;
         if (blocks < 2) {
@@ -165,14 +165,14 @@ fn createTree(allocator: Allocator, data: []const u8) Allocator.Error!*Node {
 }
 
 /// Utility method for concatenating a slice to the front of another.
-fn concat_front(dest: []u8, src: []u8) void {
+fn concatFront(dest: []u8, src: []u8) void {
     std.debug.assert(dest.len >= src.len);
     var i = dest.len - src.len;
     while (i > 0) {
         i -= 1;
         dest[i + src.len] = dest[i];
     }
-    std.mem.copy(u8, dest[0..], src);
+    std.mem.copyForwards(u8, dest[0..], src);
 }
 
 pub const Rope = struct {
@@ -192,8 +192,8 @@ pub const Rope = struct {
 
         // Use only a suffix if the rope is too small.
         if (bytes.len < min_bytes) {
-            rope.suf_len = @intCast(u8, bytes.len);
-            std.mem.copy(u8, rope.suf_buf[0..], bytes);
+            rope.suf_len = @intCast(bytes.len);
+            std.mem.copyForwards(u8, rope.suf_buf[0..], bytes);
             return rope;
         }
         rope.root = try createTree(allocator, bytes);
@@ -227,14 +227,14 @@ pub const Rope = struct {
             // Concatenate a small buffer onto the end of self.
             const total = self.suf_len + other.suf_len;
             if (total < min_bytes) {
-                std.mem.copy(u8, self.suf_buf[self.suf_len..], other.suf_buf[0..other.suf_len]);
+                std.mem.copyForwards(u8, self.suf_buf[self.suf_len..], other.suf_buf[0..other.suf_len]);
                 self.suf_len = total;
             } else {
                 std.debug.assert(total <= cap_bytes);
                 const node = try self.allocator.create(Node);
                 node.* = .{ .len = total };
-                std.mem.copy(u8, node.data[0..], self.suf_buf[0..self.suf_len]);
-                std.mem.copy(u8, node.data[self.suf_len..], other.suf_buf[0..other.suf_len]);
+                std.mem.copyForwards(u8, node.data[0..], self.suf_buf[0..self.suf_len]);
+                std.mem.copyForwards(u8, node.data[self.suf_len..], other.suf_buf[0..other.suf_len]);
                 Node.connect(node, self.root, 0);
                 node.update();
                 self.root = node;
@@ -248,15 +248,15 @@ pub const Rope = struct {
             const total = root.len + self.suf_len;
             if (total < cap_bytes) {
                 root.len += self.suf_len;
-                concat_front(root.data[0..root.len], self.suf_buf[0..self.suf_len]);
+                concatFront(root.data[0..root.len], self.suf_buf[0..self.suf_len]);
             } else {
                 std.debug.assert(root.len >= min_bytes);
                 const node = try self.allocator.create(Node);
                 node.* = .{ .len = min_bytes };
 
-                std.mem.copy(u8, node.data[0..], self.suf_buf[0..self.suf_len]);
-                std.mem.copy(u8, node.data[self.suf_len..], root.data[0 .. min_bytes - self.suf_len]);
-                std.mem.copy(u8, root.data[0..], root.data[min_bytes - self.suf_len .. root.len]);
+                std.mem.copyForwards(u8, node.data[0..], self.suf_buf[0..self.suf_len]);
+                std.mem.copyForwards(u8, node.data[self.suf_len..], root.data[0 .. min_bytes - self.suf_len]);
+                std.mem.copyForwards(u8, root.data[0..], root.data[min_bytes - self.suf_len .. root.len]);
                 root.len -= min_bytes - self.suf_len;
                 root.update();
 
@@ -287,7 +287,7 @@ pub const Rope = struct {
             return try Rope.create(self.allocator, &.{});
         }
         if (index >= length - self.suf_len) {
-            const suf_rem = @intCast(u8, index - (length - self.suf_len));
+            const suf_rem: u8 = @intCast(index - (length - self.suf_len));
             const rope = try create(self.allocator, self.suf_buf[suf_rem..self.suf_len]);
             self.suf_len = suf_rem;
             return rope;
@@ -307,19 +307,19 @@ pub const Rope = struct {
         const root = self.root.?;
         const left_len = if (root.child[0]) |c| c.size else 0;
         std.debug.assert(left_len <= index and index < left_len + root.len);
-        const pivot = @intCast(u8, index - left_len);
+        const pivot: u8 = @intCast(index - left_len);
 
         // Copy the left half of the node's data and establish the a new root.
         if (index - left_len >= min_bytes) { // doesn't fit in self.suf_buf
             const new_root = try self.allocator.create(Node);
             new_root.* = .{ .len = pivot };
-            std.mem.copy(u8, new_root.data[0..], root.data[0..pivot]);
+            std.mem.copyForwards(u8, new_root.data[0..], root.data[0..pivot]);
             Node.connect(new_root, root.child[0], 0);
             new_root.update();
             self.root = new_root;
             self.suf_len = 0;
         } else { // fits in self.suf_buf
-            std.mem.copy(u8, self.suf_buf[0..], root.data[0..pivot]);
+            std.mem.copyForwards(u8, self.suf_buf[0..], root.data[0..pivot]);
             self.suf_len = pivot;
             self.root = root.child[0];
             if (self.root) |n| n.parent = null;
@@ -327,7 +327,7 @@ pub const Rope = struct {
 
         // Create the right half of the rope. First, we fix invariants.
         root.child[0] = null;
-        std.mem.copy(u8, root.data[0..], root.data[pivot..root.len]);
+        std.mem.copyForwards(u8, root.data[0..], root.data[pivot..root.len]);
         root.len -= pivot;
         root.update();
 
@@ -344,13 +344,13 @@ pub const Rope = struct {
             rope.root = new_root;
             if (root.len + new_root.len <= cap_bytes) {
                 new_root.len += root.len;
-                concat_front(new_root.data[0..new_root.len], root.data[0..root.len]);
+                concatFront(new_root.data[0..new_root.len], root.data[0..root.len]);
                 new_root.update();
                 root.destroy(self.allocator);
             } else {
                 const copy_len = min_bytes - root.len;
-                std.mem.copy(u8, root.data[root.len..], new_root.data[0..copy_len]);
-                std.mem.copy(u8, new_root.data[0..], new_root.data[copy_len..new_root.len]);
+                std.mem.copyForwards(u8, root.data[root.len..], new_root.data[0..copy_len]);
+                std.mem.copyForwards(u8, new_root.data[0..], new_root.data[copy_len..new_root.len]);
                 root.len += copy_len;
                 new_root.len -= copy_len;
                 Node.connect(new_root, root, 0);
@@ -360,7 +360,7 @@ pub const Rope = struct {
         } else if (rope.suf_len + root.len >= min_bytes) {
             // Concatenate the suffix onto the node directly.
             std.debug.assert(rope.suf_len + root.len <= cap_bytes);
-            std.mem.copy(u8, root.data[root.len..], rope.suf_buf[0..rope.suf_len]);
+            std.mem.copyForwards(u8, root.data[root.len..], rope.suf_buf[0..rope.suf_len]);
             root.len += rope.suf_len;
             root.update();
             rope.suf_len = 0;
@@ -368,7 +368,7 @@ pub const Rope = struct {
         } else {
             // Delete the root and only use the suffix buffer.
             rope.suf_len += root.len;
-            concat_front(rope.suf_buf[0..rope.suf_len], root.data[0..root.len]);
+            concatFront(rope.suf_buf[0..rope.suf_len], root.data[0..root.len]);
             root.destroy(self.allocator);
         }
 
@@ -436,12 +436,12 @@ pub const Chunks = struct {
         if (self.start >= self.end) {
             return null;
         }
-        const len = std.math.min(self.end - self.start, block_size);
+        const len = @min(self.end - self.start, block_size);
         var i: u64 = 0;
         while (i < len) {
             const slice = self.rope.get_scan(self.start + i).?;
-            const k = std.math.min(slice.len, len - i);
-            std.mem.copy(u8, self.buf[i..], slice[0..k]);
+            const k = @min(slice.len, len - i);
+            std.mem.copyForwards(u8, self.buf[i..], slice[0..k]);
             i += k;
         }
         self.start += len;
