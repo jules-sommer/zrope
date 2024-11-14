@@ -27,7 +27,16 @@ const Node = struct {
     len: u8 = 0,
     data: [cap_bytes]u8 = undefined,
 
-    fn dir(self: *const Node) u1 {
+    /// A method that returns the direction of a given `Node` relative to it's parent as a single u1 bit.
+    /// i.e 1 corresponds to our Node being on the right-hand side of the parent. Thus, 0 corresponds to a left-hand side child node.
+    ///
+    ///          P
+    ///        /   \
+    ///       n1   n2
+    ///       ^^   ^^
+    ///       |    Node.directionFromParent() == 1
+    ///       Node.directionFromParent() == 0
+    fn directionFromParent(self: *const Node) u1 {
         return if (self.parent) |p| @intFromBool(p.child[1] == self) else 0;
     }
 
@@ -45,13 +54,13 @@ const Node = struct {
         if (pa) |p| p.child[x] = ch;
     }
 
-    fn rot(self: *Node) void {
+    fn rotate(self: *Node) void {
         std.debug.assert(self.parent != null);
 
-        const x = self.dir();
+        const x = self.directionFromParent();
         const pa = self.parent.?;
 
-        connect(pa.parent, self, pa.dir());
+        connect(pa.parent, self, pa.directionFromParent());
         connect(pa, self.child[x ^ 1], x);
         connect(self, pa, x ^ 1);
 
@@ -62,15 +71,15 @@ const Node = struct {
     /// Run the splay operation on this node, bringing it to the root.
     fn splay(self: *Node) void {
         while (self.parent != null and self.parent.?.parent != null) {
-            if (self.dir() == self.parent.?.dir()) {
-                self.parent.?.rot();
+            if (self.directionFromParent() == self.parent.?.directionFromParent()) {
+                self.parent.?.rotate();
             } else {
-                self.rot();
+                self.rotate();
             }
-            self.rot();
+            self.rotate();
         }
         if (self.parent != null) {
-            self.rot();
+            self.rotate();
         }
         std.debug.assert(self.parent == null);
     }
@@ -165,14 +174,15 @@ fn createTree(allocator: Allocator, data: []const u8) Allocator.Error!*Node {
 }
 
 /// Utility method for concatenating a slice to the front of another.
-fn concatFront(dest: []u8, src: []u8) void {
+fn concatFront(comptime T: type, dest: []T, src: []T) void {
     std.debug.assert(dest.len >= src.len);
+
     var i = dest.len - src.len;
     while (i > 0) {
         i -= 1;
         dest[i + src.len] = dest[i];
     }
-    std.mem.copyForwards(u8, dest[0..], src);
+    std.mem.copyForwards(T, dest[0..], src);
 }
 
 pub const Rope = struct {
@@ -381,12 +391,12 @@ pub const Rope = struct {
     /// here. For example, they have static optimality and are guaranteed to use
     /// only linear time when accessing nodes in inorder traversal.
     pub fn get(self: *Rope, i: u64) ?u8 {
-        const slice = self.get_scan(i) orelse return null;
+        const slice = self.getScan(i) orelse return null;
         return slice[0];
     }
 
     /// Get a byte of the rope, also returning any remaining contiguous bytes.
-    fn get_scan(self: *Rope, i: u64) ?[]u8 {
+    fn getScan(self: *Rope, i: u64) ?[]u8 {
         const length = self.len();
         if (i >= length) {
             return null;
@@ -439,7 +449,7 @@ pub const Chunks = struct {
         const len = @min(self.end - self.start, block_size);
         var i: u64 = 0;
         while (i < len) {
-            const slice = self.rope.get_scan(self.start + i).?;
+            const slice = self.rope.getScan(self.start + i).?;
             const k = @min(slice.len, len - i);
             std.mem.copyForwards(u8, self.buf[i..], slice[0..k]);
             i += k;
