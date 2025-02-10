@@ -4,21 +4,12 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const lib = b.addStaticLibrary(.{
-        .name = "rope-splay-tree",
-        .version = .{
-            .major = 0,
-            .minor = 0,
-            .patch = 0,
-        },
+    const zrope = b.addModule("zrope", .{
         .root_source_file = b.path("src/main.zig"),
-        .target = target,
         .optimize = optimize,
+        .target = target,
     });
-
-    lib.linkLibC();
-
-    b.installArtifact(lib);
+    _ = zrope; // autofix
 
     const main_tests = b.addTest(.{
         .name = "unit-tests",

@@ -22,7 +22,7 @@
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
-            zig.outputs.overlays.default
+            zig.overlays.default
             (_: prev: {
               inherit (zls.outputs.packages.${prev.system}) zls;
             })
@@ -31,14 +31,11 @@
       in
       {
         devShells.default = pkgs.mkShell {
-          nativeBuildInputs = [
-            zig.outputs.packages.${system}.master
-            zls.outputs.packages.${system}.zls
+          buildInputs = [
+            zig.packages.${system}.master
+            zls.packages.${system}.zls
           ];
 
-          shellHook = ''
-            fish
-          '';
         };
       }
     );
