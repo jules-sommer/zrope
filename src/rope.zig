@@ -3,11 +3,12 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-/// The minimum number of bytes stored in a splay tree node.
-const min_bytes = 64;
-
 /// The capacity of a splay tree node in bytes.
 const cap_bytes = 127;
+
+/// The minimum number of bytes stored in a splay tree node.
+/// Automatically set to (cap_bytes + 1) / 2.
+const min_bytes = (cap_bytes + 1) / 2;
 
 comptime {
     if (min_bytes < 1 or min_bytes * 2 != cap_bytes + 1) {
@@ -258,7 +259,7 @@ pub const Rope = struct {
             const total = root.len + self.suf_len;
             if (total < cap_bytes) {
                 root.len += self.suf_len;
-                concatFront(root.data[0..root.len], self.suf_buf[0..self.suf_len]);
+                concatFront(u8, root.data[0..root.len], self.suf_buf[0..self.suf_len]);
             } else {
                 std.debug.assert(root.len >= min_bytes);
                 const node = try self.allocator.create(Node);
@@ -354,7 +355,7 @@ pub const Rope = struct {
             rope.root = new_root;
             if (root.len + new_root.len <= cap_bytes) {
                 new_root.len += root.len;
-                concatFront(new_root.data[0..new_root.len], root.data[0..root.len]);
+                concatFront(u8, new_root.data[0..new_root.len], root.data[0..root.len]);
                 new_root.update();
                 root.destroy(self.allocator);
             } else {
@@ -378,7 +379,7 @@ pub const Rope = struct {
         } else {
             // Delete the root and only use the suffix buffer.
             rope.suf_len += root.len;
-            concatFront(rope.suf_buf[0..rope.suf_len], root.data[0..root.len]);
+            concatFront(u8, rope.suf_buf[0..rope.suf_len], root.data[0..root.len]);
             root.destroy(self.allocator);
         }
 

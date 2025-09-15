@@ -3,3 +3,5 @@
 /target
 dump.rdb
 .zig-cache
+.direnv/bin
+.direnv

@@ -1,7 +1,9 @@
 const std = @import("std");
 const tests = @import("test.zig");
-pub const Rope = @import("rope.zig").Rope;
-pub const Chunks = @import("rope.zig").Chunks;
+const rope = @import("rope.zig");
+
+pub const Rope = rope.Rope;
+pub const Chunks = rope.Chunks;
 
 test {
     std.testing.refAllDecls(Rope);
